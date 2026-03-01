@@ -28,9 +28,9 @@ class CustomUserManager(BaseUserManager):
 
 
 class CustomUser(AbstractBaseUser):
-    email = models.EmailField(_("email address"), unique=True, max_length=255)
+    email = models.EmailField(gettext_lazy("email address"), unique=True, max_length=255)
     balance = models.DecimalField(
-        _("balance"), max_digits=15, decimal_places=2, default=0.00
+        gettext_lazy("balance"), max_digits=15, decimal_places=2, default=0.00
     )
 
     is_active = models.BooleanField(default=True)
