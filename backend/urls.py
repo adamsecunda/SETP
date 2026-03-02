@@ -21,6 +21,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from backend.apps.orders.views import CancelOrderView, PlaceMarketBuyView
 from backend.apps.users.views import RegisterView
 from backend.apps.users.views import DepositView
 
@@ -31,4 +32,6 @@ urlpatterns = [
     path('api/register/', RegisterView.as_view(), name='register'),
     path('api/', include('backend.apps.assets.urls')),
     path('api/deposit/', DepositView.as_view(), name='deposit'),
+    path('api/orders/market-buy/', PlaceMarketBuyView.as_view(), name='place_market_buy'),
+    path('api/orders/<int:pk>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 ]

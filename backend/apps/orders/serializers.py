@@ -1,0 +1,43 @@
+from rest_framework import serializers
+from .models import Order, OrderSide, OrderStatus, OrderType
+from backend.apps.assets.models import Asset
+from decimal import Decimal
+
+class PlaceMarketBuySerializer(serializers.Serializer):
+    asset_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+    def validate_asset_id(self, value):
+        if not Asset.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Asset not found.")
+        return value
+
+    def validate(self, data):
+        asset = Asset.objects.get(id=data['asset_id'])
+        user = self.context['request'].user
+        total_cost = Decimal(data['quantity']) *  Decimal('100.00')  # TODO - replace with real share price
+
+        if user.balance < total_cost:
+            raise serializers.ValidationError(
+                f"Insufficient balance. Required: ${total_cost:.2f}, Available: ${user.balance:.2f}"
+            )
+            
+        data['total_cost'] = total_cost
+        return data
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        asset = Asset.objects.get(id=validated_data['asset_id'])
+
+        order = Order.objects.create(
+            user=user,
+            asset=asset,
+            side=OrderSide.BUY,
+            type=OrderType.MARKET,
+            quantity=validated_data['quantity'],
+            status=OrderStatus.PENDING,
+        )
+        # Deduct balance immediately
+        user.balance -= validated_data['total_cost']
+        user.save()
+        return order

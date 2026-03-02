@@ -5,6 +5,6 @@ from .models import Asset
 
 @admin.register(Asset)
 class AssetAdmin(admin.ModelAdmin):
-    list_display = ('ticker', 'name', 'type', 'created_at')
+    list_display = ('id','ticker', 'name', 'type', 'created_at')
     search_fields = ('ticker', 'name')
     list_filter = ('type',)

@@ -16,7 +16,7 @@ class OrderStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
     PARTIAL = "PARTIAL", "Partially Filled"
 
-class Order(models.Model):
+class  Order(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="orders")
     asset = models.ForeignKey(Asset, on_delete=models.PROTECT)
     side = models.CharField(max_length=10, choices=OrderSide.choices)
