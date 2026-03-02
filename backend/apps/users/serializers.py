@@ -14,3 +14,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password'],
         )
         return user
+    
+class DepositSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=0.01)
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be positive.")
+        return value
