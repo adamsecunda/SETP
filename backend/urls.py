@@ -21,6 +21,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from backend.apps.holdings.views import PortfolioView
 from backend.apps.orders.views import CancelOrderView, PlaceMarketBuyView, PlaceMarketSellView
 from backend.apps.users.views import RegisterView
 from backend.apps.users.views import DepositView
@@ -35,4 +36,5 @@ urlpatterns = [
     path('api/orders/market-buy/', PlaceMarketBuyView.as_view(), name='place_market_buy'),
     path('api/orders/<int:pk>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
     path('api/orders/market-sell/', PlaceMarketSellView.as_view(), name='place_market_sell'),
+    path('api/portfolio/', PortfolioView.as_view(), name='portfolio'),
 ]
