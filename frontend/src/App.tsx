@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react'
 
+import Layout from './components/Layout'
+import TopBar from './components/TopBar.tsx'
+import PortfolioSummary from './components/PortfolioSummary'
+import HoldingsPanel from './components/HoldingsPanel'
+
 const BASE_URL = 'http://127.0.0.1:8000/api'
 
 function App() {
@@ -53,99 +58,72 @@ function App() {
     if (token) loadPortfolio()
   }, [token])
 
+  /* ================= LOGIN ================= */
+
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-10 rounded-xl shadow-xl w-full max-w-md">
-          <h1 className="text-3xl font-bold mb-8 text-center text-blue-800">SETP Trading</h1>
-          <div className="mb-6">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full p-4 border rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full p-4 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          {error && <p className="text-red-600 mb-4 text-center">{error}</p>}
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        <div className="p-8 border border-gray-800 bg-gray-950 w-full max-w-md">
+          <h1 className="text-xl mb-6 text-orange-400 font-mono">
+            SETP TERMINAL LOGIN
+          </h1>
+
+          <input
+            type="email"
+            placeholder="EMAIL"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full p-3 mb-4 bg-black border border-gray-800 text-sm"
+          />
+
+          <input
+            type="password"
+            placeholder="PASSWORD"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full p-3 mb-4 bg-black border border-gray-800 text-sm"
+          />
+
+          {error && (
+            <p className="text-red-500 text-xs mb-4">{error}</p>
+          )}
+
           <button
             onClick={login}
-            className="w-full bg-blue-600 text-white p-4 rounded font-semibold hover:bg-blue-700 transition"
+            className="w-full p-3 border border-orange-500 text-orange-400 hover:bg-orange-500 hover:text-black text-sm"
           >
-            Login
+            LOGIN
           </button>
         </div>
       </div>
     )
   }
 
+  /* ================= TERMINAL DASHBOARD ================= */
+
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-xl p-8">
-        <div className="flex justify-between items-center mb-10">
-          <h1 className="text-4xl font-bold text-blue-800">Portfolio</h1>
-          <button
-            onClick={logout}
-            className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700"
-          >
-            Logout
-          </button>
+    <Layout>
+      <TopBar onLogout={logout} />
+
+      {loading && (
+        <div className="p-6 text-gray-500 text-sm">
+          LOADING...
         </div>
+      )}
 
-        {loading && <p className="text-center text-xl">Loading...</p>}
-        {error && <p className="text-red-600 text-center text-xl">{error}</p>}
+      {error && (
+        <div className="p-6 text-red-500 text-sm">
+          {error}
+        </div>
+      )}
 
-        {portfolio && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-              <div className="bg-gray-50 p-6 rounded-xl text-center">
-                <h3 className="text-lg text-gray-600 mb-2">Cash Balance</h3>
-                <p className="text-4xl font-bold">${portfolio.balance.toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-50 p-6 rounded-xl text-center">
-                <h3 className="text-lg text-gray-600 mb-2">Holdings Value</h3>
-                <p className="text-4xl font-bold">
-                  ${(portfolio.total_portfolio_value - portfolio.balance).toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-blue-50 p-6 rounded-xl text-center">
-                <h3 className="text-lg text-blue-800 mb-2">Total Value</h3>
-                <p className="text-4xl font-bold text-blue-800">
-                  ${portfolio.total_portfolio_value.toFixed(2)}
-                </p>
-              </div>
-            </div>
-
-            <h2 className="text-2xl font-bold mb-6">Holdings ({portfolio.holdings_count})</h2>
-
-            {portfolio.holdings.length === 0 ? (
-              <p className="text-gray-600 text-center py-12">No holdings yet — place an order!</p>
-            ) : (
-              <div className="grid gap-6">
-                {portfolio.holdings.map((h: any, i: number) => (
-                  <div key={i} className="bg-gray-50 p-6 rounded-xl flex justify-between items-center">
-                    <div>
-                      <h3 className="text-xl font-semibold">{h.asset.ticker} - {h.asset.name}</h3>
-                      <p className="text-gray-600">Quantity: {h.quantity}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold">${h.current_value.toFixed(2)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+      {portfolio && (
+        <>
+          <PortfolioSummary portfolio={portfolio} />
+          <HoldingsPanel portfolio={portfolio} />
+        </>
+      )}
+    </Layout>
   )
 }
 
