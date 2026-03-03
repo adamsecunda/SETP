@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from backend.apps.holdings.models import Holding
 from .models import Order, OrderSide, OrderStatus, OrderType
 from backend.apps.assets.models import Asset
 from decimal import Decimal
@@ -40,4 +42,42 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         # Deduct balance immediately
         user.balance -= validated_data['total_cost']
         user.save()
+        return order
+
+class PlaceMarketSellSerializer(serializers.Serializer):
+    asset_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1)
+
+    def validate_asset_id(self, value):
+        if not Asset.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Asset not found.")
+        return value
+
+    def validate(self, data):
+        asset = Asset.objects.get(id=data['asset_id'])
+        user = self.context['request'].user
+
+        # Check holdings
+        holding = Holding.objects.filter(user=user, asset=asset).first()
+        if not holding or holding.quantity < data['quantity']:
+            available = holding.quantity if holding else 0
+            raise serializers.ValidationError(
+                f"Insufficient holdings. Available: {available}, Requested: {data['quantity']}"
+            )
+
+        return data
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        asset = Asset.objects.get(id=validated_data['asset_id'])
+
+        order = Order.objects.create(
+            user=user,
+            asset=asset,
+            side=OrderSide.SELL,
+            type=OrderType.MARKET,
+            quantity=validated_data['quantity'],
+            status=OrderStatus.PENDING,
+        )
+
         return order

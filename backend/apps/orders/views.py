@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from .serializers import PlaceMarketBuySerializer
+from .serializers import PlaceMarketBuySerializer, PlaceMarketSellSerializer
 from .models import Order, OrderStatus
 
 class PlaceMarketBuyView(APIView):
@@ -61,3 +61,25 @@ class CancelOrderView(APIView):
             "refunded": refund_amount,
             "new_balance": float(request.user.balance)
         })
+    
+class PlaceMarketSellView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = PlaceMarketSellSerializer(
+            data=request.data,
+            context={'request': request}
+        )
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        order = serializer.save()
+
+        return Response({
+            "message": "Market sell order placed successfully (pending)",
+            "order_id": order.id,
+            "asset": order.asset.ticker,
+            "quantity": order.quantity,
+            "status": order.status,
+        }, status=status.HTTP_201_CREATED)
