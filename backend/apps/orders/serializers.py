@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from backend.apps.holdings.models import Holding
+from backend.apps.orders.utils import get_mid_price
 from .models import Order, OrderSide, OrderStatus, OrderType
 from backend.apps.assets.models import Asset
 from decimal import Decimal
@@ -17,7 +18,8 @@ class PlaceMarketBuySerializer(serializers.Serializer):
     def validate(self, data):
         asset = Asset.objects.get(id=data['asset_id'])
         user = self.context['request'].user
-        total_cost = Decimal(data['quantity']) *  Decimal('100.00')  # TODO - replace with real share price
+        price_per_share = get_mid_price(asset) or Decimal('100.00')
+        total_cost = Decimal(data['quantity']) * price_per_share
 
         if user.balance < total_cost:
             raise serializers.ValidationError(
