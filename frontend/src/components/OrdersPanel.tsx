@@ -3,8 +3,19 @@ import type { MarketPrice } from '../hooks/useMarketPrices'
 
 const BASE_URL = 'http://127.0.0.1:8000'
 
-interface AssetResult { id: number; ticker: string; name: string }
-interface Order { id: number; asset: { ticker: string; name: string }; side: 'BUY' | 'SELL'; quantity: number; status: string }
+interface AssetResult {
+  id: number
+  ticker: string
+  name: string
+}
+
+interface Order {
+  id: number
+  asset: { ticker: string; name: string }
+  side: 'BUY' | 'SELL'
+  quantity: number
+  status: string
+}
 
 interface Props {
   token: string
@@ -12,7 +23,11 @@ interface Props {
   onOrderComplete?: () => Promise<void> | void
 }
 
-export default function OrdersPanel({ token, marketPrices = [], onOrderComplete }: Props) {
+export default function OrdersPanel({ 
+  token, 
+  marketPrices = [], 
+  onOrderComplete 
+}: Props) {
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<AssetResult[]>([])
@@ -23,17 +38,18 @@ export default function OrdersPanel({ token, marketPrices = [], onOrderComplete 
 
   const searchRef = useRef<any>(null)
 
-  // 1. Create Price Map (same logic as HoldingsPanel)
+  // Map market prices for O(1) lookup by ticker
   const priceMap = useMemo(() => {
     const map: Record<string, number> = {}
     marketPrices.forEach(p => { map[p.ticker] = p.price })
     return map
   }, [marketPrices])
 
-  // 2. Get live price for selected asset and calculate total
+  //  Derive live data for selected asset
   const currentLivePrice = selectedAsset ? priceMap[selectedAsset.ticker] : null
   const estimatedTotal = currentLivePrice ? (Number(quantity) * currentLivePrice).toFixed(2) : "0.00"
 
+  // Polling for active orders
   useEffect(() => {
     if (!token) return
     fetchActiveOrders()
@@ -41,25 +57,40 @@ export default function OrdersPanel({ token, marketPrices = [], onOrderComplete 
     return () => clearInterval(interval)
   }, [token])
 
+  // Asset Search with Debouncing
   useEffect(() => {
-    if (!searchQuery.trim() || selectedAsset) { setSearchResults([]); return }
+    if (!searchQuery.trim() || selectedAsset) {
+      setSearchResults([])
+      return
+    }
+
     if (searchRef.current) clearTimeout(searchRef.current)
+
     searchRef.current = setTimeout(async () => {
       try {
         setSearchLoading(true)
-        const res = await fetch(`${BASE_URL}/api/assets/?search=${encodeURIComponent(searchQuery)}`, 
-          { headers: { Authorization: `Bearer ${token}` } })
-        if (res.ok) {
-          const data = await res.json()
-          setSearchResults(Array.isArray(data) ? data : data.results || [])
-        }
-      } finally { setSearchLoading(false) }
+        const res = await fetch(
+          `${BASE_URL}/api/assets/?search=${encodeURIComponent(searchQuery)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+        if (!res.ok) return
+        const data = await res.json()
+        setSearchResults(Array.isArray(data) ? data : data.results || [])
+      } catch (err) {
+        console.error("Search error:", err)
+      } finally {
+        setSearchLoading(false)
+      }
     }, 300)
+
+    return () => { if (searchRef.current) clearTimeout(searchRef.current) }
   }, [searchQuery, token, selectedAsset])
 
   const fetchActiveOrders = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/orders/active/`, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${BASE_URL}/api/orders/active/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       if (res.ok) setOrders(await res.json())
     } catch (err) { console.error(err) }
   }
@@ -67,29 +98,34 @@ export default function OrdersPanel({ token, marketPrices = [], onOrderComplete 
   const placeOrder = async (side: 'BUY' | 'SELL') => {
     if (!selectedAsset || !quantity || Number(quantity) <= 0) return
     const url = side === 'BUY' ? `${BASE_URL}/api/orders/market-buy/` : `${BASE_URL}/api/orders/market-sell/`
+    
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ asset_id: selectedAsset.id, quantity: Number(quantity) })
       })
+      
       const data = await res.json()
+
       if (res.ok) {
         setFeedback({ msg: `EXECUTED: ${side} ${quantity} ${selectedAsset.ticker}`, type: 'success' })
-        setQuantity(''); setSearchQuery(''); setSelectedAsset(null)
+        setQuantity(''); setSearchQuery(''); setSelectedAsset(null);
         setTimeout(fetchActiveOrders, 500)
         if (onOrderComplete) onOrderComplete()
       } else {
-        setFeedback({ msg: data.error || "REJECTED", type: 'error' })
+        setFeedback({ msg: data.error || "TRANSACTION_REJECTED", type: 'error' })
       }
-    } catch (err) { setFeedback({ msg: "CONNECTION_LOST", type: 'error' }) }
+    } catch (err) { 
+      setFeedback({ msg: "TERMINAL_OFFLINE", type: 'error' })
+    }
   }
 
-  const cancelOrder = async (orderId: number) => {
+  const cancelOrder = async (id: number) => {
     try {
-      const res = await fetch(`${BASE_URL}/api/orders/${orderId}/cancel/`, {
+      const res = await fetch(`${BASE_URL}/api/orders/${id}/cancel/`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}` }
       })
       if (res.status === 204 || res.ok) fetchActiveOrders()
     } catch (err) { console.error(err) }
@@ -97,23 +133,47 @@ export default function OrdersPanel({ token, marketPrices = [], onOrderComplete 
 
   return (
     <div className="bg-black border border-gray-800 rounded p-6 font-mono text-sm text-orange-400 mt-6 shadow-2xl">
-      <div className="text-lg font-bold mb-6 tracking-tighter border-b border-gray-900 pb-2">ORDERS_MANAGEMENT.SYS</div>
+      <div className="text-lg font-bold mb-6 tracking-tighter border-b border-gray-900 pb-2 flex justify-between items-center">
+        <span>ORDERS_TERMINAL.EXE</span>
+        <span className="text-[10px] text-green-600 animate-pulse">LIVE_FEED</span>
+      </div>
 
       <div className="mb-8 border border-gray-800 p-4 rounded bg-gray-950/30">
         {feedback && (
-          <div className={`mb-4 p-2 text-[10px] border ${feedback.type === 'success' ? 'border-green-900 text-green-500 bg-green-950/20' : 'border-red-900 text-red-500 bg-red-950/20'} animate-pulse`}>
+          <div className={`mb-4 p-2 text-[10px] border ${feedback.type === 'success' ? 'border-green-900 bg-green-950/20 text-green-500' : 'border-red-900 bg-red-950/20 text-red-500'}`}>
             {feedback.msg}
           </div>
         )}
 
+        {/* Search Input */}
         <div className="relative mb-4">
-          <input value={searchQuery} onChange={e => { setSearchQuery(e.target.value); if (selectedAsset) setSelectedAsset(null) }} placeholder="SCAN_ASSET_TICKER" className="w-full bg-black border border-gray-800 p-2 text-orange-400 focus:border-orange-500 outline-none placeholder:text-gray-700" />
+          <input 
+            value={searchQuery} 
+            onChange={e => {
+              setSearchQuery(e.target.value)
+              if (selectedAsset) setSelectedAsset(null)
+            }} 
+            placeholder="SCAN_TICKER_OR_COMPANY" 
+            className="w-full bg-black border border-gray-800 p-2 text-orange-400 focus:border-orange-500 outline-none placeholder:text-gray-800" 
+          />
+          
+          {searchLoading && <div className="text-[9px] text-gray-600 mt-1 italic">QUERYING_INDEX...</div>}
+
           {searchResults.length > 0 && !selectedAsset && (
-            <div className="absolute z-50 w-full border border-gray-800 bg-gray-950 shadow-2xl">
+            <div className="absolute z-50 w-full border border-gray-800 bg-black shadow-[0_20px_50px_rgba(0,0,0,1)] max-h-64 overflow-y-auto">
               {searchResults.map(a => (
-                <div key={a.id} className="p-2 hover:bg-orange-950 cursor-pointer flex justify-between items-center border-b border-gray-900" onClick={() => { setSelectedAsset(a); setSearchQuery(a.ticker) }}>
-                  <span className="font-bold">{a.ticker}</span>
-                  <span className="text-[10px] text-gray-500 uppercase">${priceMap[a.ticker]?.toFixed(2) || '0.00'}</span>
+                <div 
+                  key={a.id} 
+                  className="p-3 hover:bg-orange-950/30 cursor-pointer flex justify-between items-center border-b border-gray-900 group" 
+                  onClick={() => { setSelectedAsset(a); setSearchQuery(a.ticker) }}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-bold text-orange-400">{a.ticker}</span>
+                    <span className="text-[9px] text-gray-500 uppercase tracking-tighter truncate max-w-[200px]">{a.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-white">${priceMap[a.ticker]?.toFixed(2) || '0.00'}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -121,42 +181,67 @@ export default function OrdersPanel({ token, marketPrices = [], onOrderComplete 
         </div>
 
         {selectedAsset && (
-          <div className="mb-4 p-3 border border-gray-800 bg-black/50 text-[11px] space-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-600">MARKET_PRICE:</span>
-              <span className="text-white font-bold">${currentLivePrice?.toFixed(2) || "---"}</span>
+          <div className="mb-4 p-3 border border-gray-800 bg-black/80 text-[11px] space-y-2">
+            <div className="flex justify-between text-gray-500">
+              <span>SELECTED_ASSET:</span>
+              <span className="text-white uppercase">{selectedAsset.name}</span>
             </div>
-            <div className="flex justify-between border-t border-gray-900 pt-1 mt-1">
-              <span className="text-gray-600">EST_TOTAL:</span>
-              <span className="text-orange-500 font-bold">${estimatedTotal}</span>
+            <div className="flex justify-between border-t border-gray-900 pt-1">
+              <span>MARKET_VAL:</span>
+              <span className="text-green-500 font-bold">${currentLivePrice?.toFixed(2) || "---"}</span>
+            </div>
+            <div className="flex justify-between border-t border-gray-900 pt-1 text-orange-500">
+              <span>EST_COMMITMENT:</span>
+              <span className="font-bold font-mono text-lg">${estimatedTotal}</span>
             </div>
           </div>
         )}
 
-        <input type="number" placeholder="UNIT_QUANTITY" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-black border border-gray-800 p-2 mb-4 text-orange-400 focus:border-orange-500 outline-none" />
+        <input 
+          type="number" 
+          placeholder="UNIT_QUANTITY" 
+          value={quantity} 
+          onChange={e => setQuantity(e.target.value)} 
+          className="w-full bg-black border border-gray-800 p-2 mb-4 text-orange-400 focus:border-orange-500 outline-none font-mono" 
+        />
 
         <div className="flex gap-4">
-          <button onClick={() => placeOrder('BUY')} className="flex-1 border border-green-600 text-green-500 py-2 hover:bg-green-600 hover:text-black transition-all font-bold">INIT_BUY</button>
-          <button onClick={() => placeOrder('SELL')} className="flex-1 border border-red-600 text-red-500 py-2 hover:bg-red-600 hover:text-black transition-all font-bold">INIT_SELL</button>
+          <button onClick={() => placeOrder('BUY')} className="flex-1 border border-green-600 text-green-500 py-2 hover:bg-green-600 hover:text-black transition-all font-bold">BUY.INIT</button>
+          <button onClick={() => placeOrder('SELL')} className="flex-1 border border-red-600 text-red-500 py-2 hover:bg-red-600 hover:text-black transition-all font-bold">SELL.INIT</button>
         </div>
       </div>
 
-      <div className="text-[10px] text-gray-600 mb-3 tracking-widest uppercase">Live_Orders_Queue</div>
+      <div className="text-[10px] text-gray-600 mb-3 tracking-widest uppercase flex items-center gap-2">
+        <div className="w-1.5 h-1.5 bg-orange-600 rounded-full animate-ping"></div>
+        ACTIVE_ORDER_PIPELINE
+      </div>
+
       <div className="space-y-2">
         {orders.length === 0 ? (
-          <div className="text-gray-800 border border-dashed border-gray-900 p-4 text-center text-xs">BUFFER_EMPTY</div>
+          <div className="text-gray-800 border border-dashed border-gray-900 p-8 text-center text-xs italic tracking-widest">
+            NO_PENDING_FLOWS
+          </div>
         ) : (
           orders.map(order => (
-            <div key={order.id} className="flex justify-between items-center bg-gray-950/50 border border-gray-800 p-3 rounded group">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] px-1 border ${order.side === 'BUY' ? 'border-green-900 text-green-500' : 'border-red-900 text-red-500'}`}>{order.side}</span>
+            <div key={order.id} className="flex justify-between items-center bg-gray-950/50 border border-gray-800 p-3 rounded group hover:border-orange-900/40 transition-colors">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] px-1.5 border font-bold ${order.side === 'BUY' ? 'border-green-900 text-green-500' : 'border-red-900 text-red-500'}`}>
+                    {order.side}
+                  </span>
                   <span className="text-white font-bold">{order.quantity} {order.asset.ticker}</span>
                 </div>
-                <div className="text-[9px] text-gray-600 uppercase mt-1">STATUS: {order.status}</div>
+                <div className="text-[9px] text-gray-600 uppercase mt-1">
+                  ID: {order.id} | <span className="text-orange-900">{order.status}</span>
+                </div>
               </div>
               {(order.status === 'PENDING' || order.status === 'PARTIAL') && (
-                <button onClick={() => cancelOrder(order.id)} className="text-[10px] border border-gray-700 text-gray-500 px-3 py-1 hover:border-red-500 hover:text-red-500 transition-all uppercase">[Abort]</button>
+                <button 
+                  onClick={() => cancelOrder(order.id)} 
+                  className="text-[9px] border border-gray-800 text-gray-600 px-3 py-1 hover:border-red-600 hover:text-red-500 transition-all uppercase"
+                >
+                  [Terminate]
+                </button>
               )}
             </div>
           ))
