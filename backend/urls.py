@@ -25,7 +25,7 @@ from backend.apps.assets.market_views import live_prices
 from backend.apps.assets.views import AssetSearchView
 from backend.apps.holdings.views import PortfolioView
 from backend.apps.orders.views import ActiveOrdersListView, CancelOrderView, PlaceMarketBuyView, PlaceMarketSellView
-from backend.apps.users.views import RegisterView
+from backend.apps.users.views import RegisterView, WithdrawView
 from backend.apps.users.views import DepositView
 from backend.apps.watchlists.views import WatchlistDetailView, WatchlistItemCreateView, WatchlistItemDeleteView, WatchlistListCreateView
 
@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/register/', RegisterView.as_view(), name='register'),
     path('api/', include('backend.apps.assets.urls')),
     path('api/deposit/', DepositView.as_view(), name='deposit'),
+    path('api/withdraw/', WithdrawView.as_view(), name='deposit'),
     path('api/orders/market-buy/', PlaceMarketBuyView.as_view(), name='place_market_buy'),
     path('api/orders/<int:pk>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
     path('api/orders/market-sell/', PlaceMarketSellView.as_view(), name='place_market_sell'),

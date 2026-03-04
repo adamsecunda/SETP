@@ -9,6 +9,7 @@ from .serializers import RegisterSerializer
 from .serializers import DepositSerializer
 from .models import CustomUser
 from backend.apps.transactions.models import Transaction, TransactionType
+from django.db import transaction
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
@@ -40,5 +41,42 @@ class DepositView(APIView):
 
         return Response({
             "message": f"Deposited {amount:.2f}",
+            "new_balance": float(user.balance)
+        }, status=status.HTTP_200_OK)
+        
+        
+        
+class WithdrawView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = DepositSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        amount = serializer.validated_data['amount']
+        user = request.user
+
+        # Check if user has enough money
+        if user.balance < amount:
+            return Response(
+                {"error": "Insufficient funds for this withdrawal."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        #  Wrap in transaction to ensure data integrity
+        with transaction.atomic():
+            user.balance -= amount
+            user.save()
+
+            # Record transaction
+            Transaction.objects.create(
+                user=user,
+                type=TransactionType.WITHDRAWAL,
+                amount=amount,
+            )
+
+        return Response({
+            "message": f"Withdrew {amount:.2f}",
             "new_balance": float(user.balance)
         }, status=status.HTTP_200_OK)
