@@ -55,8 +55,7 @@ export default function App() {
       <TopBar onLogout={handleLogout} balance={portfolio?.balance} />
 
       <main className="p-6 pb-24 max-w-[1600px] mx-auto font-mono text-white">
-        
-        {/* MARKET STRIP - Removed heavy marquee to prevent UI stalling */}
+
         <div className="mb-4 bg-black border border-gray-800 overflow-x-auto px-4 py-2 flex gap-8 text-[11px] no-scrollbar">
           {memoizedPrices.map(p => (
             <div key={p.ticker} className="flex-shrink-0">
@@ -90,7 +89,7 @@ export default function App() {
                   {portfolio && <HoldingsPanel portfolio={portfolio} marketPrices={memoizedPrices} />}
                 </div>
                 <div className={activeTab === 'ORDERS' ? 'block' : 'hidden'}>
-                  <OrdersPanel token={token} onOrderComplete={handleRefresh} />
+                  <OrdersPanel token={token} marketPrices={memoizedPrices} onOrderComplete={handleRefresh} />
                 </div>
                 {activeTab === 'HISTORY' && <div className="text-center text-gray-600 text-[10px] p-12 uppercase">No historical data available.</div>}
               </div>
