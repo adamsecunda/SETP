@@ -1,174 +1,296 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
-const BASE_URL = 'http://127.0.0.1:8000/api'
+const BASE_URL = 'http://127.0.0.1:8000'
+
+interface AssetResult {
+  id: number
+  ticker: string
+  name: string
+}
 
 interface Order {
   id: number
-  asset: { id: number; ticker: string; name: string }
+  asset: { ticker: string; name: string }
   side: 'BUY' | 'SELL'
-  order_type: 'MARKET' | 'LIMIT'
   quantity: number
-  filled_quantity: number
-  price?: number
-  status: 'PENDING' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
-  created_at: string
+  status: string
 }
 
 export default function OrdersPanel({ token }: { token: string }) {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
 
-  // Trading form state
-  const [selectedAsset, setSelectedAsset] = useState('')
+  const [orders, setOrders] = useState<Order[]>([])
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<AssetResult[]>([])
+  const [selectedAsset, setSelectedAsset] = useState<AssetResult | null>(null)
+
   const [quantity, setQuantity] = useState('')
+  const [searchLoading, setSearchLoading] = useState(false)
+
+  const searchRef = useRef<any>(null)
+
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`
+  }
+  // Poll Active Orders
 
   useEffect(() => {
     if (!token) return
+
     fetchActiveOrders()
+
+    const interval = setInterval(fetchActiveOrders, 1000)
+
+    return () => clearInterval(interval)
+
   }, [token])
 
-  const fetchActiveOrders = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const res = await fetch(`${BASE_URL}/orders/active/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!res.ok) throw new Error(`Failed to load orders: ${res.status}`)
-      const data = await res.json()
-      setOrders(data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Asset Search
 
-  const placeOrder = async (side: 'BUY' | 'SELL') => {
-    if (!selectedAsset || !quantity || Number(quantity) <= 0) {
-      setError('Select asset and enter valid quantity')
+  useEffect(() => {
+
+    if (!searchQuery.trim()) {
+      setSearchResults([])
       return
     }
 
-    const url = side === 'BUY'
-      ? `${BASE_URL}/orders/market-buy/`
-      : `${BASE_URL}/orders/market-sell/`
+    if (searchRef.current) clearTimeout(searchRef.current)
 
-    setError('')
+    searchRef.current = setTimeout(async () => {
+
+      try {
+
+        setSearchLoading(true)
+
+        const res = await fetch(
+          `${BASE_URL}/api/assets/?search=${encodeURIComponent(searchQuery)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+        if (!res.ok) return
+
+        const data = await res.json()
+
+        setSearchResults(
+          Array.isArray(data) ? data : data.results || []
+        )
+
+      } catch (err) {
+        console.error(err)
+        setSearchResults([])
+      } finally {
+        setSearchLoading(false)
+      }
+
+    }, 300)
+
+    return () => {
+      if (searchRef.current) clearTimeout(searchRef.current)
+    }
+
+  }, [searchQuery, token])
+
+  // Fetch orders
+
+  const fetchActiveOrders = async () => {
     try {
+      const res = await fetch(`${BASE_URL}/api/orders/active/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      if (!res.ok) return
+
+      const data = await res.json()
+      setOrders(data)
+
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Place Order
+
+  const placeOrder = async (side: 'BUY' | 'SELL') => {
+
+    if (!selectedAsset || !quantity || Number(quantity) <= 0) return
+
+    const url =
+      side === 'BUY'
+        ? `${BASE_URL}/api/orders/market-buy/`
+        : `${BASE_URL}/api/orders/market-sell/`
+
+    try {
+
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
+        headers: authHeaders,
         body: JSON.stringify({
-          asset_id: Number(selectedAsset),
+          asset_id: selectedAsset.id,
           quantity: Number(quantity)
         })
       })
 
-      if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.detail || 'Order failed')
-      }
+      if (!res.ok) return
 
-      await res.json()
       setQuantity('')
-      setSelectedAsset('')
-      fetchActiveOrders()
-    } catch (err: any) {
-      setError(err.message)
+      setSearchQuery('')
+      setSelectedAsset(null)
+      setSearchResults([])
+
+      setTimeout(fetchActiveOrders, 500)
+
+    } catch (err) {
+      console.error(err)
     }
   }
+
+  // ------------------------------------------------
+  // Cancel Order
+  // ------------------------------------------------
 
   const cancelOrder = async (orderId: number) => {
-    if (!confirm('Cancel this order?')) return
-
     try {
-      const res = await fetch(`${BASE_URL}/orders/${orderId}/cancel/`, {
+      await fetch(`${BASE_URL}/api/orders/${orderId}/cancel/`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders
       })
-      if (!res.ok) throw new Error('Cancel failed')
+
       fetchActiveOrders()
-    } catch (err: any) {
-      setError(err.message)
+
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  if (loading) return <div className="p-6 text-gray-500 font-mono">LOADING ORDERS...</div>
-  if (error) return <div className="p-6 text-red-500 font-mono">{error}</div>
+  // Render
 
   return (
     <div className="bg-black border border-gray-800 rounded p-6 font-mono text-sm text-orange-400 mt-6">
-      <div className="text-lg font-bold mb-4">ORDERS & TRADING</div>
 
-      {/* Place Order Form */}
-      <div className="mb-8">
-        <div className="text-md font-semibold mb-2">PLACE NEW ORDER</div>
-        <div className="flex gap-4 mb-4">
-          <select
-            value={selectedAsset}
-            onChange={e => setSelectedAsset(e.target.value)}
-            className="bg-black border border-gray-800 p-2 text-orange-400 flex-1"
-          >
-            <option value="">SELECT ASSET</option>
-            <option value="13">AAPL - Apple Inc.</option>
-            {/* Add more options as needed */}
-          </select>
-          <input
-            type="number"
-            placeholder="QUANTITY"
-            value={quantity}
-            onChange={e => setQuantity(e.target.value)}
-            className="bg-black border border-gray-800 p-2 text-orange-400 w-32"
-            min="1"
-          />
+      <div className="text-lg font-bold mb-6">
+        ORDERS & TRADING
+      </div>
+
+      <div className="mb-10 border border-gray-800 p-4 rounded">
+
+        <div className="text-md font-semibold mb-4">
+          PLACE ORDER
         </div>
+
+        <div className="relative mb-4">
+
+          <input
+            value={searchQuery}
+            onChange={e => {
+              setSearchQuery(e.target.value)
+              setSelectedAsset(null)
+            }}
+            placeholder="SEARCH ASSET TICKER OR NAME"
+            className="w-full bg-black border border-gray-800 p-2 text-orange-400"
+          />
+
+          {searchLoading && (
+            <div className="text-xs text-gray-500 mt-1">
+              SEARCHING...
+            </div>
+          )}
+
+          {searchResults.length > 0 && !selectedAsset && (
+            <div className="absolute z-50 w-full max-h-48 overflow-y-auto border border-gray-800 bg-gray-900">
+
+              {searchResults.map(asset => (
+                <div
+                  key={asset.id}
+                  className="p-2 hover:bg-orange-900 cursor-pointer flex justify-between"
+                  onClick={() => {
+                    setSelectedAsset(asset)
+                    setSearchQuery(`${asset.ticker} — ${asset.name}`)
+                    setSearchResults([])
+                  }}
+                >
+                  <span className="font-bold">{asset.ticker}</span>
+                  <span className="text-gray-400 truncate ml-4">
+                    {asset.name}
+                  </span>
+                </div>
+              ))}
+
+            </div>
+          )}
+
+        </div>
+
+        <input
+          type="number"
+          placeholder="QUANTITY"
+          value={quantity}
+          onChange={e => setQuantity(e.target.value)}
+          className="w-full bg-black border border-gray-800 p-2 mb-4 text-orange-400"
+        />
+
         <div className="flex gap-4">
+
           <button
             onClick={() => placeOrder('BUY')}
-            className="border border-green-500 px-6 py-2 text-green-400 hover:bg-green-500 hover:text-black transition flex-1"
+            className="flex-1 border border-green-500 text-green-400 py-2 hover:bg-green-500 hover:text-black transition"
           >
             BUY
           </button>
+
           <button
             onClick={() => placeOrder('SELL')}
-            className="border border-red-500 px-6 py-2 text-red-400 hover:bg-red-500 hover:text-black transition flex-1"
+            className="flex-1 border border-red-500 text-red-400 py-2 hover:bg-red-500 hover:text-black transition"
           >
             SELL
           </button>
+
         </div>
+
       </div>
-      <div>
-        <div className="text-md font-semibold mb-2">ACTIVE ORDERS</div>
-        {orders.length === 0 ? (
-          <div className="text-gray-600">NO ACTIVE ORDERS</div>
-        ) : (
-          <div className="space-y-2">
-            {orders.map(order => (
-              <div key={order.id} className="flex justify-between items-center bg-gray-900/50 p-3 rounded">
-                <div>
-                  <span className="font-bold text-orange-300">
-                    {order.side} {order.quantity} × {order.asset.ticker}
-                  </span>
-                  <span className="text-gray-500 ml-3">
-                    — {order.status} {order.filled_quantity > 0 ? `(${order.filled_quantity} filled)` : ''}
-                  </span>
-                </div>
+
+      <div className="text-md font-semibold mb-3">
+        ACTIVE ORDERS
+      </div>
+
+      {orders.length === 0 ? (
+        <div className="text-gray-600">NO ACTIVE ORDERS</div>
+      ) : (
+        <div className="space-y-2">
+
+          {orders.map(order => (
+            <div key={order.id}
+              className="flex justify-between items-center bg-gray-900/50 p-3 rounded">
+
+              <div>
+                <span className="font-bold text-orange-300">
+                  {order.side} {order.quantity} × {order.asset.ticker}
+                </span>
+
+                <span className="text-gray-500 ml-3">
+                  — {order.status}
+                </span>
+              </div>
+
+              {(order.status === 'PENDING' || order.status === 'PARTIAL') && (
                 <button
                   onClick={() => cancelOrder(order.id)}
-                  className="text-red-500 hover:text-red-400 text-xs font-medium"
+                  className="text-red-500 hover:text-red-400 text-xs border border-red-900 px-2 py-1"
                 >
                   CANCEL
                 </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              )}
+
+            </div>
+          ))}
+
+        </div>
+      )}
+
     </div>
   )
 }

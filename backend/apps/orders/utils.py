@@ -1,93 +1,94 @@
 from decimal import Decimal
-from .models import Order, OrderSide, OrderStatus, OrderType
+import random
+import time
 from django.db import transaction
-from django.db.models import F
+
+from .models import Order, OrderSide, OrderStatus, OrderType
 from backend.apps.holdings.models import Holding
-from decimal import Decimal
+from backend.market.engine import get_price
 
 
+# Mid price estimation (simulation exchange)
 def get_mid_price(asset):
-    best_bid = Order.objects.filter(
-        asset=asset,
-        side=OrderSide.BUY,
-        status=OrderStatus.PENDING,
-        type=OrderType.LIMIT
-    ).order_by('-limit_price').first()
+    price = get_price(asset.ticker)
 
-    best_ask = Order.objects.filter(
-        asset=asset,
-        side=OrderSide.SELL,
-        status=OrderStatus.PENDING,
-        type=OrderType.LIMIT
-    ).order_by('limit_price').first()
+    if price is None:
+        return Decimal("100.00")
 
-    if not best_bid or not best_ask:
-        return None
+    return Decimal(str(price))
 
-    return (best_bid.limit_price + best_ask.limit_price) / Decimal('2')
 
+# Fake market order matcher (immediate fill simulation)
 def match_market_order(market_order):
-    if market_order.order_type != 'MARKET' or market_order.status != OrderStatus.PENDING:
+    if market_order.type != OrderType.MARKET:
         return
 
+    if market_order.status != OrderStatus.PENDING:
+        return
+
+    # Simulate exchange latency BEFORE locking DB
+    time.sleep(random.uniform(3, 4))
+
     with transaction.atomic():
-        # Lock the market order
-        market_order = Order.objects.select_for_update().get(id=market_order.id)
 
-        opposite_side = OrderSide.SELL if market_order.side == OrderSide.BUY else OrderSide.BUY
-        price_order = 'price' if market_order.side == OrderSide.BUY else '-price'  # best first
+        market_order = Order.objects.select_for_update().get(
+            id=market_order.id
+        )
 
-        opposite_orders = Order.objects.select_for_update().filter(
-            asset=market_order.asset,
-            side=opposite_side,
-            status=OrderStatus.PENDING,
-            order_type='LIMIT'
-        ).order_by(price_order)
+        if market_order.status != OrderStatus.PENDING:
+            return
 
-        remaining_qty = market_order.quantity
+        asset = market_order.asset
+        user = market_order.user
 
-        for opp in opposite_orders:
-            if remaining_qty <= 0:
-                break
+        execution_price = get_mid_price(asset)
+        qty = Decimal(str(market_order.quantity))
 
-            fill_qty = min(remaining_qty, opp.quantity - opp.filled_quantity)
+        holding = Holding.objects.filter(
+            user=user,
+            asset=asset
+        ).first()
 
-            # Fill at the limit order's price
-            fill_price = opp.price
+        if market_order.side == OrderSide.BUY:
 
-            # Update opposite order
-            opp.filled_quantity += fill_qty
-            if opp.filled_quantity >= opp.quantity:
-                opp.status = OrderStatus.FILLED
-            opp.save()
+            total_cost = execution_price * qty
 
-            # Update market order
-            market_order.filled_quantity += fill_qty
-            remaining_qty -= fill_qty
+            if user.balance < total_cost:
+                market_order.status = OrderStatus.CANCELLED
+                market_order.save(update_fields=["status"])
+                return
 
-            # Update holdings and balance
-            buyer = market_order.user if market_order.side == OrderSide.BUY else opp.user
-            seller = opp.user if market_order.side == OrderSide.BUY else market_order.user
+            if holding is None:
+                holding = Holding.objects.create(
+                    user=user,
+                    asset=asset,
+                    quantity=Decimal("0")
+                )
 
-            # Buyer gets asset, pays cash
-            Holding.objects.update_or_create(
-                user=buyer,
-                asset=market_order.asset,
-                defaults={'quantity': F('quantity') + fill_qty}
-            )
-            buyer.balance -= fill_qty * fill_price
-            buyer.save(update_fields=['balance'])
+            holding.quantity = Decimal(str(holding.quantity)) + qty
+            holding.save(update_fields=["quantity"])
 
-            # Seller gets cash, loses asset
-            Holding.objects.filter(user=seller, asset=market_order.asset).update(
-                quantity=F('quantity') - fill_qty
-            )
-            seller.balance += fill_qty * fill_price
-            seller.save(update_fields=['balance'])
+            user.balance -= total_cost
+            user.save(update_fields=["balance"])
 
-        # Update market order status
-        if remaining_qty == 0:
-            market_order.status = OrderStatus.FILLED
-        elif market_order.filled_quantity > 0:
-            market_order.status = OrderStatus.PARTIAL
-        market_order.save(update_fields=['filled_quantity', 'status'])
+        elif market_order.side == OrderSide.SELL:
+
+            if not holding or Decimal(str(holding.quantity)) < qty:
+                market_order.status = OrderStatus.CANCELLED
+                market_order.save(update_fields=["status"])
+                return
+
+            proceeds = execution_price * qty
+
+            holding.quantity = Decimal(str(holding.quantity)) - qty
+
+            if holding.quantity <= 0:
+                holding.delete()
+            else:
+                holding.save(update_fields=["quantity"])
+
+            user.balance += proceeds
+            user.save(update_fields=["balance"])
+
+        market_order.status = OrderStatus.FILLED
+        market_order.save(update_fields=["status"])

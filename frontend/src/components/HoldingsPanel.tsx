@@ -1,4 +1,4 @@
-import type { MarketPrice } from "../hooks/useMarketPrices"
+import type{ MarketPrice } from "../hooks/useMarketPrices"
 import { useMemo } from "react"
 
 interface Props {

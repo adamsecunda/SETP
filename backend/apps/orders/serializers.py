@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from backend.apps.holdings.models import Holding
-from backend.apps.orders.utils import get_mid_price
+from backend.apps.orders.utils import get_mid_price, match_market_order
 from .models import Order, OrderSide, OrderStatus, OrderType
 from backend.apps.assets.models import Asset
 from decimal import Decimal
@@ -47,6 +47,9 @@ class PlaceMarketBuySerializer(serializers.Serializer):
             side="buy",
             quantity=validated_data['quantity']
         )
+        
+        match_market_order(order)
+        
         return order
 
 
@@ -68,12 +71,7 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             available = holding.quantity if holding else 0
             raise serializers.ValidationError(
                 f"Insufficient holdings. Available: {available}, Requested: {data['quantity']}"
-            )
-        queue_order(
-            ticker=asset.ticker,
-            side="sell",
-            quantity=data['quantity']
-        )
+            ) 
         return data
 
     def create(self, validated_data):
@@ -87,6 +85,12 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             quantity=validated_data['quantity'],
             status=OrderStatus.PENDING,
         )
+        queue_order(
+            ticker=asset.ticker,
+            side="sell",
+            quantity=validated_data['quantity']
+        )
+        match_market_order(order)
         return order
 
 

@@ -8,6 +8,7 @@ import HoldingsPanel from './components/HoldingsPanel'
 import WatchlistsPanel from './components/WatchlistsPanel'
 import OrdersPanel from './components/OrdersPanel'
 import { useMarketPrices } from './hooks/useMarketPrices'
+import { useEffect } from 'react'
 
 type MainTab = 'HOLDINGS' | 'ORDERS' | 'HISTORY'
 
@@ -15,8 +16,12 @@ export default function App() {
 
   const { token, signIn, signOut, error: authError, loading: authLoading } = useAuth()
 
-  const { portfolio, loading: portfolioLoading, error: portfolioError } =
-    usePortfolio(token)
+const {
+  portfolio,
+  loading: portfolioLoading,
+  error: portfolioError,
+  refresh: refreshPortfolio
+} = usePortfolio(token)
 
   const { prices: marketPrices } =
     useMarketPrices(token)
@@ -71,6 +76,12 @@ export default function App() {
       </div>
     )
   }
+
+    useEffect(() => {
+    if (activeTab === 'HOLDINGS') {
+      refreshPortfolio()
+    }
+  }, [activeTab])
 
   return (
     <Layout>

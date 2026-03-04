@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+
+from backend.market.engine import get_price
 from .models import Order, OrderSide, OrderStatus, OrderType
 from .serializers import OrderSerializer, PlaceMarketBuySerializer, PlaceMarketSellSerializer
 from backend.apps.holdings.models import Holding
@@ -10,9 +12,60 @@ from backend.apps.assets.models import Asset
 from backend.apps.users.models import CustomUser
 from decimal import Decimal
 
-# Placeholder for matching 
 def match_market_order(order):
-    pass  
+    try:
+        asset = order.asset
+        user = order.user
+
+        price = get_price(asset.ticker)
+
+        if price is None:
+            price = Decimal("100.00")
+
+        execution_price = Decimal(str(price))
+        qty = order.quantity
+
+        holding = Holding.objects.filter(
+            user=user,
+            asset=asset
+        ).first()
+
+        if order.side == OrderSide.BUY:
+
+            if holding:
+                new_qty = holding.quantity + qty
+
+                holding.average_price = (
+                    (holding.average_price * holding.quantity)
+                    + (execution_price * qty)
+                ) / new_qty
+
+                holding.quantity = new_qty
+                holding.save()
+
+            else:
+                Holding.objects.create(
+                    user=user,
+                    asset=asset,
+                    quantity=qty,
+                    average_price=execution_price
+                )
+
+        elif order.side == OrderSide.SELL:
+
+            if holding:
+                holding.quantity -= qty
+
+                if holding.quantity <= 0:
+                    holding.delete()
+                else:
+                    holding.save()
+
+        order.status = OrderStatus.FILLED
+        order.save()
+
+    except Exception as e:
+        print("MATCH ENGINE ERROR:", e)
 
 
 class PlaceMarketBuyView(APIView):
@@ -32,12 +85,10 @@ class PlaceMarketBuyView(APIView):
 
         # Auto-match/fill
         match_market_order(order)
-
         return Response({
             'message': 'Market buy order placed',
             'order_id': order.id,
             'status': order.status,
-            'filled_quantity': order.filled_quantity
         }, status=status.HTTP_201_CREATED)
 
 
@@ -58,14 +109,11 @@ class PlaceMarketSellView(APIView):
 
         # Auto-match/fill
         match_market_order(order)
-
         return Response({
             'message': 'Market sell order placed',
             'order_id': order.id,
             'status': order.status,
-            'filled_quantity': order.filled_quantity
         }, status=status.HTTP_201_CREATED)
-
 
 class ActiveOrdersListView(APIView):
     permission_classes = [IsAuthenticated]
