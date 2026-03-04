@@ -1,4 +1,3 @@
-# backend/tests/test_portfolio.py
 import pytest
 from decimal import Decimal
 from .conftest import BASE_URL
