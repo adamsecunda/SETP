@@ -161,3 +161,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+REDIS_HOST = "localhost"
+REDIS_PORT = 6379

@@ -4,7 +4,7 @@ from backend.apps.orders.utils import get_mid_price
 from .models import Order, OrderSide, OrderStatus, OrderType
 from backend.apps.assets.models import Asset
 from decimal import Decimal
-
+from backend.market.engine import queue_order
 
 class PlaceMarketBuySerializer(serializers.Serializer):
     asset_id = serializers.IntegerField()
@@ -41,6 +41,12 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         # Deduct balance immediately
         user.balance -= validated_data['total_cost']
         user.save()
+
+        queue_order(
+            ticker=asset.ticker,
+            side="buy",
+            quantity=validated_data['quantity']
+        )
         return order
 
 
@@ -63,6 +69,11 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"Insufficient holdings. Available: {available}, Requested: {data['quantity']}"
             )
+        queue_order(
+            ticker=asset.ticker,
+            side="sell",
+            quantity=data['quantity']
+        )
         return data
 
     def create(self, validated_data):

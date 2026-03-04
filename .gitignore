@@ -127,3 +127,6 @@ render.yaml
 *.temp
 *.log.*
 *.backup
+
+#Redisd
+dump.rdb

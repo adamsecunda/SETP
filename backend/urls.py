@@ -21,6 +21,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from backend.apps.assets.market_views import live_prices
 from backend.apps.assets.views import AssetSearchView
 from backend.apps.holdings.views import PortfolioView
 from backend.apps.orders.views import ActiveOrdersListView, CancelOrderView, PlaceMarketBuyView, PlaceMarketSellView
@@ -45,6 +46,7 @@ urlpatterns = [
     path('api/watchlists/<int:watchlist_id>/items/<int:asset_id>/', WatchlistItemDeleteView.as_view(), name='watchlist-item-delete'),
     path('api/assets/search/', AssetSearchView.as_view(), name='asset-search'),
     path('api/orders/active/', ActiveOrdersListView.as_view(), name='active-orders'),
+    path("api/market/prices/", live_prices),
     
 
 ]
