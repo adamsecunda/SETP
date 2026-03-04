@@ -9,6 +9,7 @@ import HoldingsPanel from './components/HoldingsPanel'
 import WatchlistsPanel from './components/WatchlistsPanel'
 import OrdersPanel from './components/OrdersPanel'
 import BalancePanel from './components/BalancePanel'
+import OrderHistory from './components/OrderHistory'
 
 type MainTab = 'HOLDINGS' | 'ORDERS' | 'HISTORY'
 type SidebarTab = 'WATCHLIST' | 'BALANCE'
@@ -91,7 +92,9 @@ export default function App() {
                 <div className={activeTab === 'ORDERS' ? 'block' : 'hidden'}>
                   <OrdersPanel token={token} marketPrices={memoizedPrices} onOrderComplete={handleRefresh} />
                 </div>
-                {activeTab === 'HISTORY' && <div className="text-center text-gray-600 text-[10px] p-12 uppercase">No historical data available.</div>}
+                {activeTab === 'HISTORY' && <div className="text-center text-gray-600 text-[10px] p-12 uppercase"><div className={activeTab === 'HISTORY' ? 'block' : 'hidden'}>
+                  <OrderHistory token={token} />
+                </div></div>}
               </div>
             </div>
           </div>

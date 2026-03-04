@@ -111,3 +111,9 @@ class OrderSerializer(serializers.ModelSerializer):
             'timestamp',         
         ]
         read_only_fields = ['id', 'status', 'filled_quantity', 'timestamp']
+    
+    def get_asset(self, obj):
+        return {
+            "ticker": obj.asset.ticker,
+            "name": obj.asset.name
+        }
