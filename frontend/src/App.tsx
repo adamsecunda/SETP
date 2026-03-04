@@ -8,25 +8,25 @@ import HoldingsPanel from './components/HoldingsPanel'
 import WatchlistsPanel from './components/WatchlistsPanel'
 import OrdersPanel from './components/OrdersPanel'
 import { useMarketPrices } from './hooks/useMarketPrices'
-import { useEffect } from 'react'
+import BalancePanel from './components/BalancePanel'
 
 type MainTab = 'HOLDINGS' | 'ORDERS' | 'HISTORY'
+type SidebarTab = 'WATCHLIST' | 'BALANCE'
 
 export default function App() {
-
   const { token, signIn, signOut, error: authError, loading: authLoading } = useAuth()
 
-const {
-  portfolio,
-  loading: portfolioLoading,
-  error: portfolioError,
-  refresh: refreshPortfolio
-} = usePortfolio(token)
+  const {
+    portfolio,
+    loading: portfolioLoading,
+    error: portfolioError,
+    refresh: refreshPortfolio
+  } = usePortfolio(token)
 
-  const { prices: marketPrices } =
-    useMarketPrices(token)
+  const { prices: marketPrices } = useMarketPrices(token)
 
   const [activeTab, setActiveTab] = useState<MainTab>('HOLDINGS')
+  const [activeSidebar, setActiveSidebar] = useState<SidebarTab>('WATCHLIST')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -45,7 +45,7 @@ const {
           </h1>
 
           <input
-            className="w-full p-3 bg-black border border-gray-800 mb-4 text-orange-300"
+            className="w-full p-3 bg-black border border-gray-800 mb-4 text-orange-300 focus:outline-none focus:border-orange-500"
             placeholder="user@network.net"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -53,7 +53,7 @@ const {
 
           <input
             type="password"
-            className="w-full p-3 bg-black border border-gray-800 mb-4 text-orange-300"
+            className="w-full p-3 bg-black border border-gray-800 mb-4 text-orange-300 focus:outline-none focus:border-orange-500"
             placeholder="ACCESS_KEY"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -68,7 +68,7 @@ const {
           <button
             onClick={handleLogin}
             disabled={authLoading}
-            className="w-full p-3 border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black"
+            className="w-full p-3 border border-orange-500 text-orange-500 hover:bg-orange-500 hover:text-black transition-colors"
           >
             {authLoading ? "CONNECTING..." : "INITIATE_SESSION"}
           </button>
@@ -77,15 +77,12 @@ const {
     )
   }
 
-    useEffect(() => {
-    if (activeTab === 'HOLDINGS') {
-      refreshPortfolio()
-    }
-  }, [activeTab])
-
   return (
     <Layout>
-      <TopBar onLogout={signOut} />
+      <TopBar
+        onLogout={signOut}
+        balance={portfolio?.balance}
+      />
 
       <main className="p-6 max-w-[1600px] mx-auto font-mono text-white">
 
@@ -117,32 +114,27 @@ const {
           )}
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-6">
+        <div className="grid lg:grid-cols-12 gap-6 items-start">
 
+          {/* MAIN CONTENT AREA */}
           <div className="lg:col-span-8">
-
-            <div className="bg-gray-950 border border-gray-800 rounded">
-
+            <div className="bg-gray-950 border border-gray-800 rounded overflow-hidden">
               <div className="flex bg-black border-b border-gray-800">
-
                 {(['HOLDINGS', 'ORDERS', 'HISTORY'] as MainTab[]).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-3 text-xs font-bold border-r border-gray-800 ${
-                      activeTab === tab
-                        ? "text-orange-500 bg-gray-900 border-b-2 border-orange-500"
-                        : "text-gray-600"
-                    }`}
+                    className={`px-6 py-3 text-xs font-bold border-r border-gray-800 transition-all ${activeTab === tab
+                      ? "text-orange-500 bg-gray-900 border-b-2 border-orange-500 shadow-[inset_0_-2px_0_rgba(249,115,22,1)]"
+                      : "text-gray-600 hover:text-gray-400"
+                      }`}
                   >
                     {tab}.SYS
                   </button>
                 ))}
-
               </div>
 
-              <div className="p-2 min-h-[400px]">
-
+              <div className="p-2 min-h-[500px]">
                 {portfolioError && (
                   <div className="text-red-500 p-6">
                     {portfolioError}
@@ -157,43 +149,76 @@ const {
                 )}
 
                 {activeTab === 'ORDERS' && (
-                  <OrdersPanel token={token} />
+                  <OrdersPanel
+                    token={token}
+                    onOrderComplete={refreshPortfolio}
+                  />
                 )}
 
                 {activeTab === 'HISTORY' && (
-                  <div className="text-center text-gray-600 text-xs p-8">
-                    HISTORY_MODULE_LOADED
+                  <div className="text-center text-gray-600 text-xs p-12">
+                    <p className="animate-pulse">ACCESSING_ARCHIVAL_DATA...</p>
+                    <p className="mt-2 text-[10px] opacity-50 underline">NO_RECORDS_FOUND</p>
                   </div>
                 )}
-
               </div>
             </div>
           </div>
 
+          {/* SIDEBAR AREA */}
           <div className="lg:col-span-4">
+            <section className="bg-gray-950 border border-gray-800 rounded overflow-hidden flex flex-col min-h-[500px]">
 
-            <section className="bg-gray-950 border border-gray-800 rounded">
-
-              <div className="bg-black px-4 py-2 border-b border-gray-800 flex justify-between">
-                <span className="text-orange-500 text-xs">
-                  WATCHLIST.DATA
-                </span>
-                <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></span>
+              {/* SIDEBAR TABS */}
+              <div className="flex bg-black border-b border-gray-800">
+                {(['WATCHLIST', 'BALANCE'] as SidebarTab[]).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveSidebar(tab)}
+                    className={`flex-1 px-4 py-3 text-[10px] font-bold border-r border-gray-800 transition-all ${activeSidebar === tab
+                      ? "text-orange-500 bg-gray-900 border-b-2 border-orange-500 shadow-[inset_0_-2px_0_rgba(249,115,22,1)]"
+                      : "text-gray-600 hover:text-gray-400"
+                      }`}
+                  >
+                    {tab}.MDL
+                  </button>
+                ))}
+                <div className="px-4 flex items-center justify-center bg-black">
+                  <span className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_5px_#22c55e]"></span>
+                </div>
               </div>
 
-              <WatchlistsPanel token={token} />
+              {/* SIDEBAR CONTENT PANEL */}
+              <div className="flex-grow">
+                {activeSidebar === 'WATCHLIST' ? (
+                  <div className="animate-in fade-in slide-in-from-right-1 duration-300">
+                    <WatchlistsPanel token={token} marketPrices={marketPrices} />
+                  </div>
+                ) : (
+                  <div className="p-4 animate-in fade-in slide-in-from-right-1 duration-300">
+                    <BalancePanel
+                      token={token}
+                      onDepositComplete={refreshPortfolio}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* MODULE FOOTER */}
+              <div className="bg-black border-t border-gray-900 px-4 py-2 text-[9px] text-gray-700 flex justify-between uppercase tracking-widest">
+                <span>Status: Optimal</span>
+                <span>ID: {activeSidebar}_SEC_04</span>
+              </div>
 
             </section>
-
           </div>
 
         </div>
-
       </main>
 
-      <footer className="fixed bottom-0 w-full bg-black border-t border-gray-800 px-4 py-1 text-[9px] flex justify-between">
-        <span>SYSTEM: ONLINE</span>
-        <span>SETP_UNIV_PROJ_V1</span>
+      <footer className="fixed bottom-0 w-full bg-black border-t border-gray-800 px-4 py-1 text-[9px] flex justify-between z-50">
+        <span className="text-gray-500">SYSTEM_STATUS: <span className="text-green-600">ONLINE</span></span>
+        <span className="text-gray-700 font-bold uppercase">SETP_UNIV_PROJ_V1 // BUILT_BY_AI_GEN</span>
       </footer>
     </Layout>
   )

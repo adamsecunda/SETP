@@ -16,7 +16,13 @@ interface Order {
   status: string
 }
 
-export default function OrdersPanel({ token }: { token: string }) {
+export default function OrdersPanel({
+  token,
+  onOrderComplete
+}: {
+  token: string
+  onOrderComplete?: () => Promise<void> | void
+}) {
 
   const [orders, setOrders] = useState<Order[]>([])
 
@@ -33,7 +39,10 @@ export default function OrdersPanel({ token }: { token: string }) {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`
   }
+
+ 
   // Poll Active Orders
+ 
 
   useEffect(() => {
     if (!token) return
@@ -46,8 +55,8 @@ export default function OrdersPanel({ token }: { token: string }) {
 
   }, [token])
 
+ 
   // Asset Search
-
   useEffect(() => {
 
     if (!searchQuery.trim()) {
@@ -77,7 +86,9 @@ export default function OrdersPanel({ token }: { token: string }) {
         const data = await res.json()
 
         setSearchResults(
-          Array.isArray(data) ? data : data.results || []
+          Array.isArray(data)
+            ? data
+            : data.results || []
         )
 
       } catch (err) {
@@ -95,7 +106,9 @@ export default function OrdersPanel({ token }: { token: string }) {
 
   }, [searchQuery, token])
 
-  // Fetch orders
+ 
+  // Fetch Orders
+ 
 
   const fetchActiveOrders = async () => {
     try {
@@ -113,8 +126,8 @@ export default function OrdersPanel({ token }: { token: string }) {
     }
   }
 
+ 
   // Place Order
-
   const placeOrder = async (side: 'BUY' | 'SELL') => {
 
     if (!selectedAsset || !quantity || Number(quantity) <= 0) return
@@ -142,33 +155,20 @@ export default function OrdersPanel({ token }: { token: string }) {
       setSelectedAsset(null)
       setSearchResults([])
 
+      // Backend matcher delay buffer
       setTimeout(fetchActiveOrders, 500)
 
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  // ------------------------------------------------
-  // Cancel Order
-  // ------------------------------------------------
-
-  const cancelOrder = async (orderId: number) => {
-    try {
-      await fetch(`${BASE_URL}/api/orders/${orderId}/cancel/`, {
-        method: 'DELETE',
-        headers: authHeaders
-      })
-
-      fetchActiveOrders()
+      if (onOrderComplete) {
+        onOrderComplete()
+      }
 
     } catch (err) {
       console.error(err)
     }
   }
 
+ 
   // Render
-
   return (
     <div className="bg-black border border-gray-800 rounded p-6 font-mono text-sm text-orange-400 mt-6">
 
@@ -261,10 +261,9 @@ export default function OrdersPanel({ token }: { token: string }) {
         <div className="text-gray-600">NO ACTIVE ORDERS</div>
       ) : (
         <div className="space-y-2">
-
           {orders.map(order => (
             <div key={order.id}
-              className="flex justify-between items-center bg-gray-900/50 p-3 rounded">
+              className="flex justify-between bg-gray-900/50 p-3 rounded">
 
               <div>
                 <span className="font-bold text-orange-300">
@@ -276,18 +275,8 @@ export default function OrdersPanel({ token }: { token: string }) {
                 </span>
               </div>
 
-              {(order.status === 'PENDING' || order.status === 'PARTIAL') && (
-                <button
-                  onClick={() => cancelOrder(order.id)}
-                  className="text-red-500 hover:text-red-400 text-xs border border-red-900 px-2 py-1"
-                >
-                  CANCEL
-                </button>
-              )}
-
             </div>
           ))}
-
         </div>
       )}
 
