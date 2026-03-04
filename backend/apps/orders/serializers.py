@@ -1,10 +1,10 @@
 from rest_framework import serializers
-
 from backend.apps.holdings.models import Holding
 from backend.apps.orders.utils import get_mid_price
 from .models import Order, OrderSide, OrderStatus, OrderType
 from backend.apps.assets.models import Asset
 from decimal import Decimal
+
 
 class PlaceMarketBuySerializer(serializers.Serializer):
     asset_id = serializers.IntegerField()
@@ -20,19 +20,16 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         user = self.context['request'].user
         price_per_share = get_mid_price(asset) or Decimal('100.00')
         total_cost = Decimal(data['quantity']) * price_per_share
-
         if user.balance < total_cost:
             raise serializers.ValidationError(
                 f"Insufficient balance. Required: ${total_cost:.2f}, Available: ${user.balance:.2f}"
             )
-            
         data['total_cost'] = total_cost
         return data
 
     def create(self, validated_data):
         user = self.context['request'].user
         asset = Asset.objects.get(id=validated_data['asset_id'])
-
         order = Order.objects.create(
             user=user,
             asset=asset,
@@ -46,6 +43,7 @@ class PlaceMarketBuySerializer(serializers.Serializer):
         user.save()
         return order
 
+
 class PlaceMarketSellSerializer(serializers.Serializer):
     asset_id = serializers.IntegerField()
     quantity = serializers.IntegerField(min_value=1)
@@ -58,7 +56,6 @@ class PlaceMarketSellSerializer(serializers.Serializer):
     def validate(self, data):
         asset = Asset.objects.get(id=data['asset_id'])
         user = self.context['request'].user
-
         # Check holdings
         holding = Holding.objects.filter(user=user, asset=asset).first()
         if not holding or holding.quantity < data['quantity']:
@@ -66,13 +63,11 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"Insufficient holdings. Available: {available}, Requested: {data['quantity']}"
             )
-
         return data
 
     def create(self, validated_data):
         user = self.context['request'].user
         asset = Asset.objects.get(id=validated_data['asset_id'])
-
         order = Order.objects.create(
             user=user,
             asset=asset,
@@ -81,5 +76,23 @@ class PlaceMarketSellSerializer(serializers.Serializer):
             quantity=validated_data['quantity'],
             status=OrderStatus.PENDING,
         )
-
         return order
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    # Shows ticker or name
+    asset = serializers.StringRelatedField()  
+
+    class Meta:
+        model = Order
+        fields = [
+            'id',
+            'asset',
+            'side',
+            'type',               
+            'quantity',
+            'limit_price',       
+            'status',
+            'timestamp',         
+        ]
+        read_only_fields = ['id', 'status', 'filled_quantity', 'timestamp']
