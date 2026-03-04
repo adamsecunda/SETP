@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import TopBar from './components/TopBar.tsx'
 import PortfolioSummary from './components/PortfolioSummary'
 import HoldingsPanel from './components/HoldingsPanel'
+import WatchlistsPanel from './components/WatchlistsPanel.tsx'
 
 const BASE_URL = 'http://127.0.0.1:8000/api'
 
@@ -121,6 +122,7 @@ function App() {
         <>
           <PortfolioSummary portfolio={portfolio} />
           <HoldingsPanel portfolio={portfolio} />
+          <WatchlistsPanel token={token} />
         </>
       )}
     </Layout>

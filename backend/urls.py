@@ -25,6 +25,7 @@ from backend.apps.holdings.views import PortfolioView
 from backend.apps.orders.views import CancelOrderView, PlaceMarketBuyView, PlaceMarketSellView
 from backend.apps.users.views import RegisterView
 from backend.apps.users.views import DepositView
+from backend.apps.watchlists.views import WatchlistDetailView, WatchlistItemCreateView, WatchlistItemDeleteView, WatchlistListCreateView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -37,4 +38,8 @@ urlpatterns = [
     path('api/orders/<int:pk>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
     path('api/orders/market-sell/', PlaceMarketSellView.as_view(), name='place_market_sell'),
     path('api/portfolio/', PortfolioView.as_view(), name='portfolio'),
+    path('api/watchlists/', WatchlistListCreateView.as_view(), name='watchlist-list-create'),
+    path('api/watchlists/<int:id>/', WatchlistDetailView.as_view(), name='watchlist-detail'),
+    path('api/watchlists/<int:watchlist_id>/items/', WatchlistItemCreateView.as_view(), name='watchlist-item-create'),
+    path('api/watchlists/<int:watchlist_id>/items/<int:asset_id>/', WatchlistItemDeleteView.as_view(), name='watchlist-item-delete'),
 ]
