@@ -89,7 +89,6 @@ class PlaceMarketBuyView(APIView):
         order = serializer.save(
             user=request.user, side=OrderSide.BUY, type=OrderType.MARKET, status=OrderStatus.PENDING
         )
-        match_market_order(order)
 
         return Response({
             "message": "Market buy executed successfully",
@@ -122,7 +121,6 @@ class PlaceMarketSellView(APIView):
         order = serializer.save(
             user=request.user, side=OrderSide.SELL, type=OrderType.MARKET, status=OrderStatus.PENDING
         )
-        match_market_order(order)
 
         return Response({
             "message": "Market sell executed successfully",
