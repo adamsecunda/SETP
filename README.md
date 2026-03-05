@@ -37,7 +37,7 @@ Ensure you have the following services active on your local machine:
     ```
 4.  Start the API server:
     ```bash
-    python manage.py runserver
+    python manage.py runserver --noreload
     ```
 
 ### 3. Frontend Installation
