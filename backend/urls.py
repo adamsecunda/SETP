@@ -28,6 +28,7 @@ from backend.apps.orders.views import ActiveOrdersListView, CancelOrderView, His
 from backend.apps.users.views import RegisterView, WithdrawView
 from backend.apps.users.views import DepositView
 from backend.apps.watchlists.views import WatchlistDetailView, WatchlistItemCreateView, WatchlistItemDeleteView, WatchlistListCreateView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -49,6 +50,8 @@ urlpatterns = [
     path('api/orders/active/', ActiveOrdersListView.as_view(), name='active-orders'),
     path("api/market/prices/", live_prices),
     path('api/orders/history/', HistoryOrdersListView.as_view(), name='order-history'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     
     
 
