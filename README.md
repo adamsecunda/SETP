@@ -55,13 +55,7 @@ Ensure you have the following services active on your local machine:
     npm run dev
     ```
 
-### 4. Running the Market Engine
-To simulate live market price movements using the integrated dataset, execute the following command in a separate terminal:
-```bash
-python manage.py run_market_engine
-```
-
-### 5. Accessing the site
+### 4. Accessing the site
 Access the site on http://localhost:5173/ (or wherever Vite is running)
 
 ## Dataset Attribution
